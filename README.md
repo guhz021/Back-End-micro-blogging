@@ -1,1 +1,2 @@
 # microblog
+ |Aplicação simples de microblog onde usuários podem publicar mensagens curtas (estilo “tweet”), com suporte a hashtags. O backend é feito em Node.js puro (módulo http) usando o driver oficial do MongoDB. As coleções são criadas automaticamente na primeira inserção. O projeto inclui extração de hashtags, busca de posts por autor, hashtag ou ID, e retorna o nome do autor nos resultados.|
