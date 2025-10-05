@@ -1,4 +1,4 @@
-/* ======== GLOBAL ======== */
+
 body {
   font-family: 'Segoe UI', Tahoma, sans-serif;
   background-color: #212121;
@@ -31,7 +31,6 @@ main {
   gap: 2rem;
 }
 
-/* ======== SECTIONS ======== */
 section {
   background-color: #303030;
   padding: 1.5rem;
@@ -46,7 +45,6 @@ h2 {
   padding-bottom: 0.5rem;
 }
 
-/* ======== FORMS ======== */
 form {
   display: flex;
   flex-direction: column;
@@ -90,7 +88,6 @@ button:hover {
   background-color: #bbbbbb;
 }
 
-/* ======== LISTS ======== */
 ul {
   list-style-type: none;
   padding: 0;
@@ -119,7 +116,6 @@ ul li button:hover {
   background-color: #bbbbbb;
 }
 
-/* ======== USER LIST ======== */
 .user-list {
   margin-top: 1.5rem;
 }
@@ -131,7 +127,6 @@ ul li button:hover {
   padding-bottom: 0.4rem;
 }
 
-/* ======== SEARCH SECTIONS ======== */
 .search-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -150,7 +145,6 @@ ul li button:hover {
   }
 }
 
-/* ======== TIMELINE ======== */
 .timeline-section ul li {
   flex-direction: column;
   align-items: flex-start;
@@ -161,10 +155,9 @@ ul li button:hover {
   margin-top: 0.5rem;
 }
 
-/* ======== CONTAINER CENTRAL ======== */
 main {
   width: 90%;
-  max-width: 1100px; /* largura máxima ideal estilo Twitter */
+  max-width: 1100px; 
   margin: 0 auto;
   padding: 2rem 1rem;
   display: flex;
@@ -182,7 +175,6 @@ section {
   box-sizing: border-box;
 }
 
-/* ======== RESPONSIVIDADE ======== */
 @media (max-width: 1024px) {
   main {
     width: 95%;
