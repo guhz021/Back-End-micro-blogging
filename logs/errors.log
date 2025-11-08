@@ -1,4 +1,2 @@
-[2025-10-05T04:37:51.249Z] BSONError: input must be a 24 character hex string, 12 byte Uint8Array, or an integer
-    at new ObjectId (C:\Users\sasuk\OneDrive\Área de Trabalho\MICROBLOG\node_modules\bson\lib\bson.cjs:2538:23)
-    at IncomingMessage.<anonymous> (C:\Users\sasuk\OneDrive\Área de Trabalho\MICROBLOG\app\app.js:119:22)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[2025-05-06T12:52:48.522Z] input must be a 24 character hex string, 12 byte Uint8Array, or an integer
+[2025-05-06T13:31:10.538Z] input must be a 24 character hex string, 12 byte Uint8Array, or an integer

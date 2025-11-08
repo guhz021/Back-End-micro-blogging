@@ -1,17 +1,5 @@
 {
-  "name": "microblog",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "app.js",
-  "scripts": {
-    "dev": "nodemon app.js",
-    "start": "node app.js"
-  },
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "mongodb": "^6.20.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
+    "mongodb": "^7.0.0"
   }
 }

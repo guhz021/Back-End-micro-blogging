@@ -1,89 +1,224 @@
-import "dotenv/config";
-import { conectar, fechar } from "./src/db/conexao.js";
-import { Usuario } from "./src/classes/Usuario.js";
-import { Postagem } from "./src/classes/Postagem.js";
-import { Comentario } from "./src/classes/Comentario.js";
+const http = require('http');
+const { MongoClient, ObjectId } = require('mongodb');
+const fs = require('fs');
 
-async function main() {
-  await conectar();
+const PORT = 3000;
+const url = 'mongodb://localhost:27017';
+const dbName = 'microblog';
+let db;
 
-  // === USUÁRIO ===
-  const u = await Usuario.criar({
-    nome: "Ana",
-    email: "ana@mail.com",
-    senha: "123",
-  });
-  const u1 = await Usuario.buscarPorId(u._id);
-  const uList = await Usuario.listar();
-  const uUpd = await Usuario.atualizar(u._id, { nome: "Ana Atualizada" });
-  const uDel = await Usuario.remover(u._id);
-
-  // Recria usuário para relacionamentos
-  const autor = await Usuario.criar({
-    nome: "João",
-    email: "joao@mail.com",
-    senha: "abc",
-  });
-
-  // === POSTAGEM ===
-  const p = await Postagem.criar({
-    usuarioId: autor._id,
-    titulo: "Olá",
-    conteudo: "Primeiro post #microblog",
-  });
-  const p1 = await Postagem.buscarPorId(p._id);
-  const pListAll = await Postagem.listar();
-  const pListAutor = await Postagem.listar({ usuarioId: autor._id });
-  const pUpd = await Postagem.atualizar(p._id, {
-    titulo: "Atualizado",
-    conteudo: "Conteúdo editado #tag",
-  });
-
-  // === COMENTÁRIO ===
-  const c = await Comentario.criar({
-    postagemId: p._id,
-    usuarioId: autor._id,
-    texto: "Legal!",
-  });
-  const c1 = await Comentario.buscarPorId(c._id);
-  const cListPost = await Comentario.listar({ postagemId: p._id });
-  const cUpd = await Comentario.atualizar(c._id, { texto: "Muito legal!" });
-  const cDel = await Comentario.remover(c._id);
-
-  // Limpeza final
-  const pDel = await Postagem.remover(p._id);
-  const autorDel = await Usuario.remover(autor._id);
-
-  console.log({
-    usuarios: {
-      criado: u,
-      buscarPorId: u1,
-      listaAntes: uList,
-      atualizado: uUpd,
-      removido: uDel,
-    },
-    postagens: {
-      criado: p,
-      buscarPorId: p1,
-      listaTodas: pListAll,
-      listaPorAutor: pListAutor,
-      atualizado: pUpd,
-      removido: pDel,
-    },
-    comentarios: {
-      criado: c,
-      buscarPorId: c1,
-      listaDaPostagem: cListPost,
-      atualizado: cUpd,
-      removido: cDel,
-    },
-  });
-
-  await fechar();
+// Função para log de erros
+function logError(err) {
+  const msg = `[${new Date().toISOString()}] ${err.message}\n`;
+  fs.appendFileSync('./logs/errors.log', msg);
 }
 
-main().catch(async (e) => {
-  console.error(e);
-  await fechar();
-  process.exit(1);
-});
+// Função para extrair hashtags do texto
+function extractHashtags(text) {
+  const matches = text.match(/#\w+/g);
+  return matches ? matches.map(tag => tag.toLowerCase().substring(1)) : [];
+}
+
+MongoClient.connect(url)
+  .then(client => {
+    console.log('Conectado ao MongoDB');
+    db = client.db(dbName);
+    startServer();
+  })
+  .catch(err => {
+    logError(err);
+    console.error('Erro ao conectar no MongoDB');
+  });
+
+function startServer() {
+  http.createServer(async (req, res) => {
+    // CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      return res.end();
+    }
+
+    // Criar usuário
+    if (req.method === 'POST' && req.url === '/usuarios') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', async () => {
+        try {
+          const { nome, email } = JSON.parse(body);
+          if (!nome || !email) {
+            res.writeHead(400);
+            return res.end('Nome e email são obrigatórios');
+          }
+          const result = await db.collection('usuarios').insertOne({ nome, email });
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } catch (err) {
+          logError(err);
+          res.writeHead(500);
+          res.end('Erro ao criar usuário');
+        }
+      });
+    }
+
+    // Listar usuários
+    else if (req.method === 'GET' && req.url === '/usuarios') {
+      try {
+        const users = await db.collection('usuarios').find().toArray();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(users));
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao buscar usuários');
+      }
+    }
+
+    // Criar post
+    else if (req.method === 'POST' && req.url === '/posts') {
+      let body = '';
+      req.on('data', chunk => (body += chunk));
+      req.on('end', async () => {
+        try {
+          const { conteudo, autorId } = JSON.parse(body);
+          if (!conteudo || !autorId) {
+            res.writeHead(400);
+            return res.end('Conteúdo e autorId são obrigatórios');
+          }
+
+          const hashtags = extractHashtags(conteudo);
+          // Salva hashtags na coleção separada (evita duplicatas)
+          for (const tag of hashtags) {
+            await db.collection('hashtags').updateOne(
+              { nome: tag },
+              { $setOnInsert: { nome: tag } },
+              { upsert: true }
+            );
+          }
+      
+          const post = {
+            conteudo,
+            autorId: new ObjectId(autorId),
+            data: new Date(),
+            hashtags
+          };
+
+          const result = await db.collection('posts').insertOne(post);
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(result));
+        } catch (err) {
+          logError(err);
+          res.writeHead(500);
+          res.end('Erro ao criar post');
+        }
+      });
+    }
+
+    // Listar todos os posts
+    else if (req.method === 'GET' && req.url === '/posts') {
+      try {
+        const posts = await db.collection('posts').find().toArray();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(posts));
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao buscar posts');
+      }
+    }
+
+    // Listar posts por autorId
+    else if (req.method === 'GET' && req.url.startsWith('/posts/usuario/')) {
+      const autorId = req.url.split('/posts/usuario/')[1];
+      try {
+        const posts = await db.collection('posts')
+          .find({ autorId: new ObjectId(autorId) }).toArray();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(posts));
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao buscar posts por autor');
+      }
+    }
+
+    // **Corrigido**: Listar posts por hashtag
+    else if (req.method === 'GET' && req.url.startsWith('/posts/hashtag/')) {
+      const hashtag = decodeURIComponent(req.url.split('/posts/hashtag/')[1]).toLowerCase();
+      try {
+        const posts = await db.collection('posts')
+          .find({ hashtags: hashtag }).toArray();
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(posts));
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao buscar posts por hashtag');
+      }
+    }
+
+    // Listar hashtags
+    else if (req.method === 'GET' && req.url === '/hashtags') {
+      try {
+        const hashtags = await db.collection('hashtags').find().toArray();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(hashtags));
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao buscar hashtags');
+      }
+    }
+
+    // Excluir post por ID
+    else if (req.method === 'DELETE' && req.url.startsWith('/posts/')) {
+      const postId = req.url.split('/posts/')[1];
+      try {
+        const result = await db.collection('posts').deleteOne({ _id: new ObjectId(postId) });
+        if (result.deletedCount === 0) {
+          res.writeHead(404);
+          res.end('Post não encontrado');
+        } else {
+          res.writeHead(200);
+          res.end('Post excluído com sucesso');
+        }
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao excluir post');
+      }
+    }
+
+    // Excluir usuário por ID
+    else if (req.method === 'DELETE' && req.url.startsWith('/usuarios/')) {
+      const usuarioId = req.url.split('/usuarios/')[1];
+      try {
+        const result = await db.collection('usuarios').deleteOne({ _id: new ObjectId(usuarioId) });
+        if (result.deletedCount === 0) {
+          res.writeHead(404);
+          res.end('Usuário não encontrado');
+        } else {
+          res.writeHead(200);
+          res.end('Usuário excluído com sucesso');
+        }
+      } catch (err) {
+        logError(err);
+        res.writeHead(500);
+        res.end('Erro ao excluir usuário');
+      }
+    }
+
+    // Rota não encontrada
+    else {
+      res.writeHead(404);
+      res.end('Rota não encontrada');
+    }
+  }).listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+  });
+}
